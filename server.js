@@ -1,6 +1,5 @@
-require('dotenv').config();
 const express = require('express');
-const Database = require('better-sqlite3');
+const fs = require('fs');
 const path = require('path');
 
 const app = express();
@@ -8,34 +7,27 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------------------------------------------------------
-// SQLite setup
+// JSON file storage
 // ---------------------------------------------------------------------------
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'signs.db');
-const db = new Database(DB_PATH);
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data.json');
 
-// Enable WAL mode for better concurrent read performance
-db.pragma('journal_mode = WAL');
+function readDb() {
+  try {
+    return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  } catch {
+    return { invoices: [], signs: [] };
+  }
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS invoices (
-    invoiceId TEXT PRIMARY KEY,
-    eventName TEXT NOT NULL,
-    createdAt TEXT NOT NULL
-  );
+function writeDb(data) {
+  const tmp = DB_PATH + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, DB_PATH);
+}
 
-  CREATE TABLE IF NOT EXISTS signs (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    invoiceId  TEXT NOT NULL,
-    eventName  TEXT NOT NULL,
-    description TEXT NOT NULL,
-    quantity   INTEGER NOT NULL DEFAULT 1,
-    submittedAt TEXT NOT NULL,
-    addedToSystem INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (invoiceId) REFERENCES invoices(invoiceId)
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_signs_invoice ON signs(invoiceId);
-`);
+function nextSignId(signs) {
+  return signs.length === 0 ? 1 : Math.max(...signs.map(s => s.id)) + 1;
+}
 
 // ---------------------------------------------------------------------------
 // API Routes
@@ -45,21 +37,14 @@ db.exec(`
 app.get('/api/signs', (req, res) => {
   const { invoice } = req.query;
   if (!invoice) return res.status(400).json({ error: 'invoice param required' });
-
-  const signs = db
-    .prepare('SELECT * FROM signs WHERE invoiceId = ? ORDER BY submittedAt ASC, id ASC')
-    .all(invoice)
-    .map(row => ({ ...row, addedToSystem: row.addedToSystem === 1 }));
-
-  res.json(signs);
+  const { signs } = readDb();
+  res.json(signs.filter(s => s.invoiceId === invoice));
 });
 
 // GET /api/invoices
 app.get('/api/invoices', (req, res) => {
-  const invoices = db
-    .prepare('SELECT * FROM invoices ORDER BY createdAt DESC')
-    .all();
-  res.json(invoices);
+  const { invoices } = readDb();
+  res.json([...invoices].reverse());
 });
 
 // POST /api/invoices
@@ -68,18 +53,12 @@ app.post('/api/invoices', (req, res) => {
   if (!invoiceId || !eventName) {
     return res.status(400).json({ error: 'invoiceId and eventName required' });
   }
-
-  const existing = db
-    .prepare('SELECT invoiceId FROM invoices WHERE invoiceId = ?')
-    .get(invoiceId);
-
-  if (existing) {
+  const db = readDb();
+  if (db.invoices.find(i => i.invoiceId === invoiceId)) {
     return res.json({ existed: true, invoiceId, eventName });
   }
-
-  db.prepare('INSERT INTO invoices (invoiceId, eventName, createdAt) VALUES (?, ?, ?)')
-    .run(invoiceId, eventName, new Date().toISOString());
-
+  db.invoices.push({ invoiceId, eventName, createdAt: new Date().toISOString() });
+  writeDb(db);
   res.json({ existed: false, invoiceId, eventName });
 });
 
@@ -92,24 +71,24 @@ app.post('/api/signs', (req, res) => {
   if (signs.length > 100) {
     return res.status(400).json({ error: 'Maximum 100 signs per submission' });
   }
-
   const valid = signs.filter(s => s.description && s.description.trim());
   if (valid.length === 0) {
     return res.status(400).json({ error: 'No valid signs provided' });
   }
-
+  const db = readDb();
   const now = new Date().toISOString();
-  const insert = db.prepare(
-    'INSERT INTO signs (invoiceId, eventName, description, quantity, submittedAt, addedToSystem) VALUES (?, ?, ?, ?, ?, 0)'
-  );
-
-  const insertMany = db.transaction(items => {
-    for (const s of items) {
-      insert.run(invoiceId, eventName, s.description.trim(), Number(s.quantity) || 1, now);
-    }
+  valid.forEach(s => {
+    db.signs.push({
+      id: nextSignId(db.signs),
+      invoiceId,
+      eventName,
+      description: s.description.trim(),
+      quantity: Number(s.quantity) || 1,
+      submittedAt: now,
+      addedToSystem: false,
+    });
   });
-
-  insertMany(valid);
+  writeDb(db);
   res.json({ saved: valid.length });
 });
 
@@ -118,10 +97,11 @@ app.patch('/api/signs/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { addedToSystem } = req.body;
   if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
-
-  db.prepare('UPDATE signs SET addedToSystem = ? WHERE id = ?')
-    .run(addedToSystem ? 1 : 0, id);
-
+  const db = readDb();
+  const sign = db.signs.find(s => s.id === id);
+  if (!sign) return res.status(404).json({ error: 'Sign not found' });
+  sign.addedToSystem = !!addedToSystem;
+  writeDb(db);
   res.json({ ok: true });
 });
 

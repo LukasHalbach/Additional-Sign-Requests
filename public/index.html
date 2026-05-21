@@ -283,6 +283,22 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Past invoice list rows ── */
+    .invoice-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--tsi-border);
+      flex-wrap: wrap;
+    }
+    .invoice-row:last-child { border-bottom: none; }
+    .invoice-row-info { flex: 1; min-width: 0; }
+    .invoice-row-id { font-weight: 700; font-size: .9rem; }
+    .invoice-row-event { font-size: .82rem; color: var(--tsi-muted); margin-top: 2px; }
+    .invoice-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
     /* ── Invoice selector (manager tab 2) ── */
     .invoice-selector { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 20px; }
     .invoice-selector .field { margin-bottom: 0; flex: 1; }
@@ -398,7 +414,8 @@ function renderManagerView() {
         <div class="field-row">
           <div class="field">
             <label for="inv-id">Invoice ID</label>
-            <input type="text" id="inv-id" placeholder="e.g. INV-2024-001" />
+            <input type="text" id="inv-id" placeholder="e.g. INV-2024-001"
+              oninput="clearDuplicateWarning()" />
           </div>
           <div class="field">
             <label for="evt-name">Event Name</label>
@@ -413,10 +430,21 @@ function renderManagerView() {
           <label>Shareable Client Link</label>
           <div class="link-box">
             <input type="text" id="share-link" readonly />
-            <button class="btn btn-gold btn-sm" onclick="copyLink()">Copy</button>
+            <button class="btn btn-gold btn-sm" onclick="copyLink('share-link','copy-feedback')">Copy</button>
           </div>
           <div class="copy-feedback" id="copy-feedback">Copied to clipboard!</div>
         </div>
+      </div>
+
+      <!-- Past invoices / link lookup -->
+      <div class="card">
+        <h2>Past Invoices</h2>
+        <div style="margin-bottom:14px; display:flex; gap:8px; align-items:center;">
+          <input type="text" id="inv-search" placeholder="Search by invoice ID or event name…"
+            oninput="filterInvoiceList()" style="max-width:360px;" />
+          <button class="btn btn-outline btn-sm" onclick="loadInvoiceList()">↻ Refresh</button>
+        </div>
+        <div id="invoice-list"><div class="empty-state">Loading…</div></div>
       </div>
     </div>
 
@@ -439,7 +467,7 @@ function renderManagerView() {
       </div>
     </div>
   `;
-  loadInvoices();
+  loadInvoices(); // populates dropdown + past invoices list
 }
 
 function switchTab(name) {
@@ -451,6 +479,9 @@ function switchTab(name) {
   });
 }
 
+// Cache of all invoices for duplicate checking and list filtering
+let allInvoices = [];
+
 async function generateLink() {
   const invoiceId = $('inv-id').value.trim();
   const eventName = $('evt-name').value.trim();
@@ -461,26 +492,49 @@ async function generateLink() {
     return;
   }
 
+  // Check for duplicate before hitting the server
+  const duplicate = allInvoices.find(inv => inv.invoiceId === invoiceId);
+  if (duplicate) {
+    const existingLink = buildClientUrl(duplicate.invoiceId, duplicate.eventName);
+    alertEl.innerHTML = `
+      <div class="alert alert-error">
+        <strong>Invoice ID "${escHtml(invoiceId)}" already exists</strong> (${escHtml(duplicate.eventName)}).<br>
+        <span style="font-size:.85rem;">Use the existing link below, or choose a different Invoice ID.</span>
+      </div>`;
+    $('share-link').value = existingLink;
+    $('link-result').style.display = 'block';
+    return;
+  }
+
   try {
     await api('POST', '/api/invoices', { invoiceId, eventName });
-    const url = new URL(location.href);
-    url.search = '';
-    url.searchParams.set('invoice', invoiceId);
-    url.searchParams.set('event', encodeURIComponent(eventName));
-
-    const linkUrl = `${url.origin}${url.pathname}?invoice=${encodeURIComponent(invoiceId)}&event=${encodeURIComponent(eventName)}`;
-
+    const linkUrl = buildClientUrl(invoiceId, eventName);
     $('share-link').value = linkUrl;
     $('link-result').style.display = 'block';
     alertEl.innerHTML = '<div class="alert alert-success">Invoice saved. Share the link below with your client.</div>';
+    // Refresh both the list and the review dropdown
+    await loadInvoices();
   } catch (err) {
     alertEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
   }
 }
 
-function copyLink() {
-  navigator.clipboard.writeText($('share-link').value).then(() => {
-    const fb = $('copy-feedback');
+function clearDuplicateWarning() {
+  const alertEl = $('gen-alert');
+  if (alertEl && alertEl.querySelector('.alert-error')) {
+    alertEl.innerHTML = '';
+    $('link-result').style.display = 'none';
+  }
+}
+
+function buildClientUrl(invoiceId, eventName) {
+  return `${location.origin}${location.pathname}?invoice=${encodeURIComponent(invoiceId)}&event=${encodeURIComponent(eventName)}`;
+}
+
+function copyLink(inputId, feedbackId) {
+  const val = $(inputId).value;
+  navigator.clipboard.writeText(val).then(() => {
+    const fb = $(feedbackId);
     fb.style.display = 'block';
     setTimeout(() => fb.style.display = 'none', 2000);
   });
@@ -488,21 +542,81 @@ function copyLink() {
 
 async function loadInvoices() {
   try {
-    const invoices = await api('GET', '/api/invoices');
+    allInvoices = await api('GET', '/api/invoices');
+
+    // Populate the review tab dropdown
     const sel = $('inv-select');
-    const prev = sel.value;
-    sel.innerHTML = '<option value="">— select invoice —</option>';
-    invoices.forEach(inv => {
-      const opt = document.createElement('option');
-      opt.value = inv.invoiceId;
-      opt.dataset.event = inv.eventName;
-      opt.textContent = `${inv.invoiceId} – ${inv.eventName}`;
-      sel.append(opt);
-    });
-    if (prev) sel.value = prev;
+    if (sel) {
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">— select invoice —</option>';
+      allInvoices.forEach(inv => {
+        const opt = document.createElement('option');
+        opt.value = inv.invoiceId;
+        opt.dataset.event = inv.eventName;
+        opt.textContent = `${inv.invoiceId} – ${inv.eventName}`;
+        sel.append(opt);
+      });
+      if (prev) sel.value = prev;
+    }
+
+    // Refresh the past invoices list on tab 1
+    renderInvoiceList(allInvoices);
   } catch (err) {
     console.error('Failed to load invoices:', err);
   }
+}
+
+async function loadInvoiceList() {
+  await loadInvoices();
+}
+
+function filterInvoiceList() {
+  const q = ($('inv-search').value || '').toLowerCase();
+  const filtered = q
+    ? allInvoices.filter(inv =>
+        inv.invoiceId.toLowerCase().includes(q) ||
+        inv.eventName.toLowerCase().includes(q))
+    : allInvoices;
+  renderInvoiceList(filtered, q);
+}
+
+function renderInvoiceList(invoices, highlight = '') {
+  const container = $('invoice-list');
+  if (!container) return;
+  if (invoices.length === 0) {
+    container.innerHTML = highlight
+      ? '<div class="empty-state">No invoices match your search.</div>'
+      : '<div class="empty-state">No invoices yet — generate one above.</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  invoices.forEach((inv, i) => {
+    const linkUrl = buildClientUrl(inv.invoiceId, inv.eventName);
+    const feedbackId = `inv-copy-fb-${i}`;
+    const inputId = `inv-link-${i}`;
+
+    const row = el('div', { class: 'invoice-row' });
+    row.innerHTML = `
+      <div class="invoice-row-info">
+        <div class="invoice-row-id">${escHtml(inv.invoiceId)}</div>
+        <div class="invoice-row-event">${escHtml(inv.eventName)}</div>
+      </div>
+      <div class="invoice-row-actions">
+        <input type="text" id="${inputId}" value="${escAttr(linkUrl)}" readonly
+          style="width:0;height:0;opacity:0;position:absolute;pointer-events:none;" />
+        <button class="btn btn-outline btn-sm" onclick="copyLink('${inputId}','${feedbackId}')">Copy Link</button>
+        <button class="btn btn-primary btn-sm"
+          onclick="switchTab('review'); document.getElementById('inv-select').value='${escAttr(inv.invoiceId)}'; loadSignsForInvoice();">
+          View
+        </button>
+      </div>
+      <div style="width:100%;">
+        <div class="copy-feedback" id="${feedbackId}">Copied to clipboard!</div>
+      </div>
+    `;
+    container.append(row);
+  });
 }
 
 async function loadSignsForInvoice() {

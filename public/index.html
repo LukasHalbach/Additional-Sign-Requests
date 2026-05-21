@@ -8,14 +8,14 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --tsi-blue: #003865;
-      --tsi-gold: #C8972B;
-      --tsi-light: #F4F6F9;
-      --tsi-border: #D1D9E6;
-      --tsi-text: #1A2637;
-      --tsi-muted: #6B7A99;
-      --tsi-green: #1A7F4B;
-      --tsi-green-light: #E6F4EE;
+      --tsi-blue: #2A7A2A;
+      --tsi-gold: #1A1A1A;
+      --tsi-light: #F5F5F5;
+      --tsi-border: #D0D0D0;
+      --tsi-text: #1A1A1A;
+      --tsi-muted: #666666;
+      --tsi-green: #2A7A2A;
+      --tsi-green-light: #E6F5E6;
       --tsi-red: #C0392B;
       --radius: 8px;
     }
@@ -42,7 +42,7 @@
       font-size: 1.5rem;
       font-weight: 800;
       letter-spacing: .05em;
-      color: var(--tsi-gold);
+      color: #fff;
     }
     header .title {
       font-size: 1rem;
@@ -68,10 +68,10 @@
     h2 {
       font-size: 1.15rem;
       font-weight: 700;
-      color: var(--tsi-blue);
+      color: var(--tsi-green);
       margin-bottom: 18px;
       padding-bottom: 10px;
-      border-bottom: 2px solid var(--tsi-gold);
+      border-bottom: 2px solid #1A1A1A;
       display: inline-block;
     }
 
@@ -94,9 +94,9 @@
       transition: color .15s, background .15s;
     }
     .tab-btn.active {
-      background: var(--tsi-blue);
+      background: #1A1A1A;
       color: #fff;
-      border-color: var(--tsi-blue);
+      border-color: #1A1A1A;
     }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
@@ -150,7 +150,7 @@
     .btn:active { transform: scale(.98); }
     .btn-primary { background: var(--tsi-blue); color: #fff; }
     .btn-primary:hover { opacity: .88; }
-    .btn-gold { background: var(--tsi-gold); color: #fff; }
+    .btn-gold { background: #1A1A1A; color: #fff; }
     .btn-gold:hover { opacity: .88; }
     .btn-sm { padding: 6px 12px; font-size: .8rem; }
     .btn-outline {
@@ -262,7 +262,7 @@
     }
     .alert-success { background: var(--tsi-green-light); color: var(--tsi-green); border: 1px solid #a8d5bc; }
     .alert-error { background: #FDECEA; color: var(--tsi-red); border: 1px solid #f5c6c2; }
-    .alert-info { background: #E8F0FC; color: #1558D6; border: 1px solid #b6cdf5; }
+    .alert-info { background: #E6F5E6; color: #2A7A2A; border: 1px solid #a8d5a8; }
 
     /* ── Spinner ── */
     .spinner {
@@ -295,7 +295,7 @@
     }
     .progress-fill {
       height: 100%;
-      background: var(--tsi-gold);
+      background: #1A1A1A;
       transition: width .4s ease;
     }
 

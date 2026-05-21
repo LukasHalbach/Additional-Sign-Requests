@@ -283,6 +283,41 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Prefixed invoice input ── */
+    .inv-input-wrap {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid var(--tsi-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .inv-input-wrap:focus-within {
+      border-color: var(--tsi-blue);
+      box-shadow: 0 0 0 3px rgba(42,122,42,.12);
+    }
+    .inv-prefix {
+      background: var(--tsi-light);
+      border-right: 1px solid var(--tsi-border);
+      padding: 9px 10px;
+      font-weight: 700;
+      font-size: .95rem;
+      color: var(--tsi-muted);
+      user-select: none;
+      white-space: nowrap;
+    }
+    .inv-input-wrap input {
+      border: none;
+      border-radius: 0;
+      box-shadow: none !important;
+      flex: 1;
+      min-width: 0;
+    }
+    .inv-input-wrap input:focus { outline: none; box-shadow: none; }
+    /* Hide number input spinners */
+    .inv-input-wrap input::-webkit-outer-spin-button,
+    .inv-input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .inv-input-wrap input[type=number] { -moz-appearance: textfield; }
+
     /* ── Past invoice list rows ── */
     .invoice-row {
       display: flex;
@@ -413,9 +448,12 @@ function renderManagerView() {
         <div id="gen-alert"></div>
         <div class="field-row">
           <div class="field">
-            <label for="inv-id">Invoice ID</label>
-            <input type="text" id="inv-id" placeholder="e.g. INV-2024-001"
-              oninput="clearDuplicateWarning()" />
+            <label for="inv-num">Invoice ID</label>
+            <div class="inv-input-wrap">
+              <span class="inv-prefix">INV-</span>
+              <input type="number" id="inv-num" placeholder="12345" min="1"
+                max="99999" step="1" oninput="clearDuplicateWarning()" />
+            </div>
           </div>
           <div class="field">
             <label for="evt-name">Event Name</label>
@@ -482,13 +520,25 @@ function switchTab(name) {
 // Cache of all invoices for duplicate checking and list filtering
 let allInvoices = [];
 
+function getInvoiceId() {
+  const num = $('inv-num').value.trim();
+  if (!num) return '';
+  const n = parseInt(num, 10);
+  if (isNaN(n) || n < 1 || n > 99999) return '';
+  return `INV-${n}`;
+}
+
 async function generateLink() {
-  const invoiceId = $('inv-id').value.trim();
+  const invoiceId = getInvoiceId();
   const eventName = $('evt-name').value.trim();
   const alertEl = $('gen-alert');
 
-  if (!invoiceId || !eventName) {
-    alertEl.innerHTML = '<div class="alert alert-error">Please fill in both Invoice ID and Event Name.</div>';
+  if (!invoiceId) {
+    alertEl.innerHTML = '<div class="alert alert-error">Please enter a valid 1–5 digit invoice number.</div>';
+    return;
+  }
+  if (!eventName) {
+    alertEl.innerHTML = '<div class="alert alert-error">Please enter an Event Name.</div>';
     return;
   }
 
@@ -521,7 +571,7 @@ async function generateLink() {
 
 function clearDuplicateWarning() {
   const alertEl = $('gen-alert');
-  if (alertEl && alertEl.querySelector('.alert-error')) {
+  if (alertEl) {
     alertEl.innerHTML = '';
     $('link-result').style.display = 'none';
   }

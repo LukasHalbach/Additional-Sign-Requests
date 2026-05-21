@@ -200,6 +200,7 @@
       padding: 9px 10px;
       border-bottom: 1px solid var(--tsi-border);
       vertical-align: middle;
+      word-break: break-word;
     }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: var(--tsi-light); }
@@ -219,7 +220,14 @@
       display: grid;
       grid-template-columns: 1fr 90px 36px;
       gap: 8px;
-      align-items: center;
+      align-items: start;
+    }
+    .sign-row textarea {
+      resize: none;
+      overflow: hidden;
+      min-height: 38px;
+      line-height: 1.4;
+      padding: 8px 12px;
     }
     .sign-row input[type="number"] { text-align: center; }
     .remove-row {
@@ -244,7 +252,7 @@
       border-bottom: 1px solid var(--tsi-border);
     }
     .prev-sign:last-child { border-bottom: none; }
-    .prev-sign-desc { font-weight: 600; }
+    .prev-sign-desc { font-weight: 600; word-break: break-word; }
     .prev-sign-meta { font-size: .8rem; color: var(--tsi-muted); }
     .prev-sign-qty {
       font-size: .85rem;
@@ -688,17 +696,23 @@ function addSignRow() {
   const rowId = `row-${signRowCount}`;
   const div = el('div', { class: 'sign-row', id: rowId });
   div.innerHTML = `
-    <input type="text" placeholder="Sign description" class="sign-desc"
-      aria-label="Sign description ${signRowCount}" />
+    <textarea rows="1" placeholder="Sign description" class="sign-desc"
+      aria-label="Sign description ${signRowCount}"></textarea>
     <input type="number" value="1" min="1" max="9999" class="sign-qty"
       aria-label="Quantity ${signRowCount}" />
     <button class="remove-row" onclick="removeSignRow('${rowId}')" title="Remove row">×</button>
   `;
   rows.append(div);
-  updateRowCountLabel();
 
-  // Focus the new description field
-  div.querySelector('.sign-desc').focus();
+  // Auto-resize textarea as user types
+  const ta = div.querySelector('.sign-desc');
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  });
+
+  updateRowCountLabel();
+  ta.focus();
 }
 
 function removeSignRow(rowId) {

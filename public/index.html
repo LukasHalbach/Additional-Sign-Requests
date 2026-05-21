@@ -564,7 +564,7 @@ function renderSignsTable(signs, container, invoiceId) {
       <td style="text-align:center;">
         <input type="checkbox" ${sign.addedToSystem ? 'checked' : ''}
           style="width:18px;height:18px;cursor:pointer;"
-          onchange="toggleAdded(this, ${sign.rowIndex}, '${escAttr(invoiceId)}')" />
+          onchange="toggleAdded(this, ${sign.id}, '${escAttr(invoiceId)}')" />
       </td>
     `;
     tbody.append(tr);

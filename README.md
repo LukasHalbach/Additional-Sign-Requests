@@ -2,46 +2,33 @@
 
 A sign survey web app for TSi print/sign shop. Managers generate shareable client links; clients submit sign requests; managers track which signs have been added to the production system.
 
+Data is stored in a local **SQLite** database (`signs.db`) — no external accounts or services required.
+
 ## Quick Start
-
-### 1. Set up Google Sheets
-
-1. Create a new Google Sheet (note the spreadsheet ID from the URL).
-2. Create a [Google Cloud service account](https://console.cloud.google.com/iam-admin/serviceaccounts):
-   - Enable the **Google Sheets API** for your project.
-   - Create a service account and download the JSON key file.
-3. Share your Google Sheet with the service account's email address (give it **Editor** access).
-
-The app will automatically create two sheets (`Signs` and `Invoices`) with the correct headers on first run.
-
-### 2. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```
-SPREADSHEET_ID=your_spreadsheet_id_here
-GOOGLE_KEY_FILE=./service-account-key.json   # path to downloaded key file
-PORT=3000
-```
-
-Or paste the service account JSON inline:
-
-```
-GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"...",...}
-```
-
-### 3. Install and run
 
 ```bash
 npm install
 npm start
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000`. The `signs.db` file is created automatically on first run.
+
+That's it.
+
+---
+
+## Optional configuration
+
+Copy `.env.example` to `.env` if you want to change defaults:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT`   | `3000`  | Port the server listens on |
+| `DB_PATH` | `./signs.db` | Path to the SQLite database file |
 
 ---
 
@@ -62,31 +49,17 @@ Clients open the link you shared. They see:
 
 ---
 
-## Data Structure (Google Sheets)
-
-**Signs sheet** (`A:F`):
-
-| invoiceId | eventName | description | quantity | submittedAt | addedToSystem |
-|-----------|-----------|-------------|----------|-------------|---------------|
-
-**Invoices sheet** (`A:C`):
-
-| invoiceId | eventName | createdAt |
-|-----------|-----------|-----------|
-
----
-
 ## Deployment (VPS)
 
 ```bash
-# Install dependencies
 npm install --production
 
 # Run with PM2 for auto-restart
 npm install -g pm2
 pm2 start server.js --name tsi-signs
-pm2 save
-pm2 startup
+pm2 save && pm2 startup
 ```
+
+Back up `signs.db` regularly — it's the only file that holds your data.
 
 Then reverse-proxy with nginx or Caddy to expose on port 80/443.

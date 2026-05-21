@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { google } = require('googleapis');
+const Database = require('better-sqlite3');
 const path = require('path');
 
 const app = express();
@@ -8,192 +8,83 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------------------------------------------------------
-// Google Sheets auth
+// SQLite setup
 // ---------------------------------------------------------------------------
-function getAuthClient() {
-  let credentials;
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-  } else if (process.env.GOOGLE_KEY_FILE) {
-    credentials = require(path.resolve(process.env.GOOGLE_KEY_FILE));
-  } else {
-    throw new Error('No Google credentials configured. Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_KEY_FILE in .env');
-  }
-  return new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-}
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'signs.db');
+const db = new Database(DB_PATH);
 
-async function getSheets() {
-  const auth = getAuthClient();
-  return google.sheets({ version: 'v4', auth });
-}
+// Enable WAL mode for better concurrent read performance
+db.pragma('journal_mode = WAL');
 
-const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
-// Sheet names
-const SHEET_SIGNS = 'Signs';
-const SHEET_INVOICES = 'Invoices';
+db.exec(`
+  CREATE TABLE IF NOT EXISTS invoices (
+    invoiceId TEXT PRIMARY KEY,
+    eventName TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
 
-// Column layout for Signs sheet:
-// A: invoiceId | B: eventName | C: description | D: quantity | E: submittedAt | F: addedToSystem (TRUE/FALSE)
-const SIGNS_RANGE = `${SHEET_SIGNS}!A:F`;
+  CREATE TABLE IF NOT EXISTS signs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoiceId  TEXT NOT NULL,
+    eventName  TEXT NOT NULL,
+    description TEXT NOT NULL,
+    quantity   INTEGER NOT NULL DEFAULT 1,
+    submittedAt TEXT NOT NULL,
+    addedToSystem INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (invoiceId) REFERENCES invoices(invoiceId)
+  );
 
-// ---------------------------------------------------------------------------
-// Ensure sheets and headers exist on first run
-// ---------------------------------------------------------------------------
-async function ensureSheets() {
-  const sheets = await getSheets();
-
-  // Get existing sheet names
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
-  const existingNames = meta.data.sheets.map(s => s.properties.title);
-
-  const requests = [];
-  if (!existingNames.includes(SHEET_SIGNS)) {
-    requests.push({ addSheet: { properties: { title: SHEET_SIGNS } } });
-  }
-  if (!existingNames.includes(SHEET_INVOICES)) {
-    requests.push({ addSheet: { properties: { title: SHEET_INVOICES } } });
-  }
-  if (requests.length > 0) {
-    await sheets.spreadsheets.batchUpdate({ spreadsheetId: SPREADSHEET_ID, requestBody: { requests } });
-  }
-
-  // Write headers if rows are empty
-  const signsCheck = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_SIGNS}!A1`,
-  });
-  if (!signsCheck.data.values) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_SIGNS}!A1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [['invoiceId', 'eventName', 'description', 'quantity', 'submittedAt', 'addedToSystem']] },
-    });
-  }
-
-  const invoicesCheck = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_INVOICES}!A1`,
-  });
-  if (!invoicesCheck.data.values) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_INVOICES}!A1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [['invoiceId', 'eventName', 'createdAt']] },
-    });
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-async function getAllSignRows() {
-  const sheets = await getSheets();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: SIGNS_RANGE,
-  });
-  return res.data.values || [];
-}
-
-function rowToSign(row, index) {
-  return {
-    rowIndex: index, // 1-based sheet row (row 1 = header, data starts at 2)
-    invoiceId: row[0] || '',
-    eventName: row[1] || '',
-    description: row[2] || '',
-    quantity: Number(row[3]) || 0,
-    submittedAt: row[4] || '',
-    addedToSystem: (row[5] || '').toUpperCase() === 'TRUE',
-  };
-}
+  CREATE INDEX IF NOT EXISTS idx_signs_invoice ON signs(invoiceId);
+`);
 
 // ---------------------------------------------------------------------------
 // API Routes
 // ---------------------------------------------------------------------------
 
 // GET /api/signs?invoice=X
-// Returns all signs for a given invoice (used by both views)
-app.get('/api/signs', async (req, res) => {
+app.get('/api/signs', (req, res) => {
   const { invoice } = req.query;
   if (!invoice) return res.status(400).json({ error: 'invoice param required' });
 
-  try {
-    const rows = await getAllSignRows();
-    const signs = rows
-      .slice(1) // skip header
-      .map((row, i) => rowToSign(row, i + 2))
-      .filter(s => s.invoiceId === invoice);
-    res.json(signs);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  const signs = db
+    .prepare('SELECT * FROM signs WHERE invoiceId = ? ORDER BY submittedAt ASC, id ASC')
+    .all(invoice)
+    .map(row => ({ ...row, addedToSystem: row.addedToSystem === 1 }));
+
+  res.json(signs);
 });
 
 // GET /api/invoices
-// Returns all distinct invoices (for manager view tab 2)
-app.get('/api/invoices', async (req, res) => {
-  try {
-    const sheets = await getSheets();
-    const result = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_INVOICES}!A:C`,
-    });
-    const rows = (result.data.values || []).slice(1);
-    const invoices = rows.map(row => ({
-      invoiceId: row[0] || '',
-      eventName: row[1] || '',
-      createdAt: row[2] || '',
-    }));
-    res.json(invoices);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+app.get('/api/invoices', (req, res) => {
+  const invoices = db
+    .prepare('SELECT * FROM invoices ORDER BY createdAt DESC')
+    .all();
+  res.json(invoices);
 });
 
 // POST /api/invoices
-// Creates a new invoice record (manager generates link)
-app.post('/api/invoices', async (req, res) => {
+app.post('/api/invoices', (req, res) => {
   const { invoiceId, eventName } = req.body;
   if (!invoiceId || !eventName) {
     return res.status(400).json({ error: 'invoiceId and eventName required' });
   }
 
-  try {
-    const sheets = await getSheets();
+  const existing = db
+    .prepare('SELECT invoiceId FROM invoices WHERE invoiceId = ?')
+    .get(invoiceId);
 
-    // Check if already exists
-    const result = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_INVOICES}!A:A`,
-    });
-    const existing = (result.data.values || []).flat();
-    if (existing.includes(invoiceId)) {
-      return res.json({ existed: true, invoiceId, eventName });
-    }
-
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_INVOICES}!A:C`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [[invoiceId, eventName, new Date().toISOString()]] },
-    });
-    res.json({ existed: false, invoiceId, eventName });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+  if (existing) {
+    return res.json({ existed: true, invoiceId, eventName });
   }
+
+  db.prepare('INSERT INTO invoices (invoiceId, eventName, createdAt) VALUES (?, ?, ?)')
+    .run(invoiceId, eventName, new Date().toISOString());
+
+  res.json({ existed: false, invoiceId, eventName });
 });
 
 // POST /api/signs
-// Submits new signs for an invoice
-app.post('/api/signs', async (req, res) => {
+app.post('/api/signs', (req, res) => {
   const { invoiceId, eventName, signs } = req.body;
   if (!invoiceId || !eventName || !Array.isArray(signs) || signs.length === 0) {
     return res.status(400).json({ error: 'invoiceId, eventName, and signs[] required' });
@@ -202,64 +93,40 @@ app.post('/api/signs', async (req, res) => {
     return res.status(400).json({ error: 'Maximum 100 signs per submission' });
   }
 
-  const now = new Date().toISOString();
-  const rows = signs
-    .filter(s => s.description && s.description.trim())
-    .map(s => [invoiceId, eventName, s.description.trim(), Number(s.quantity) || 1, now, 'FALSE']);
-
-  if (rows.length === 0) {
+  const valid = signs.filter(s => s.description && s.description.trim());
+  if (valid.length === 0) {
     return res.status(400).json({ error: 'No valid signs provided' });
   }
 
-  try {
-    const sheets = await getSheets();
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: SIGNS_RANGE,
-      valueInputOption: 'RAW',
-      requestBody: { values: rows },
-    });
-    res.json({ saved: rows.length });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  const now = new Date().toISOString();
+  const insert = db.prepare(
+    'INSERT INTO signs (invoiceId, eventName, description, quantity, submittedAt, addedToSystem) VALUES (?, ?, ?, ?, ?, 0)'
+  );
+
+  const insertMany = db.transaction(items => {
+    for (const s of items) {
+      insert.run(invoiceId, eventName, s.description.trim(), Number(s.quantity) || 1, now);
+    }
+  });
+
+  insertMany(valid);
+  res.json({ saved: valid.length });
 });
 
-// PATCH /api/signs/:rowIndex
-// Toggles addedToSystem for a sign (manager view)
-app.patch('/api/signs/:rowIndex', async (req, res) => {
-  const rowIndex = parseInt(req.params.rowIndex, 10);
+// PATCH /api/signs/:id
+app.patch('/api/signs/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
   const { addedToSystem } = req.body;
-  if (isNaN(rowIndex) || rowIndex < 2) {
-    return res.status(400).json({ error: 'Invalid rowIndex' });
-  }
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
 
-  try {
-    const sheets = await getSheets();
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_SIGNS}!F${rowIndex}`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [[addedToSystem ? 'TRUE' : 'FALSE']] },
-    });
-    res.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  db.prepare('UPDATE signs SET addedToSystem = ? WHERE id = ?')
+    .run(addedToSystem ? 1 : 0, id);
+
+  res.json({ ok: true });
 });
 
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
-
-ensureSheets()
-  .then(() => {
-    app.listen(PORT, () => console.log(`TSi Sign Survey running on http://localhost:${PORT}`));
-  })
-  .catch(err => {
-    console.error('Failed to initialize sheets:', err.message);
-    process.exit(1);
-  });
+app.listen(PORT, () => console.log(`TSi Sign Survey running on http://localhost:${PORT}`));

@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TSi – Additional Sign Requests</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --tsi-blue: #003865;
+      --tsi-gold: #C8972B;
+      --tsi-light: #F4F6F9;
+      --tsi-border: #D1D9E6;
+      --tsi-text: #1A2637;
+      --tsi-muted: #6B7A99;
+      --tsi-green: #1A7F4B;
+      --tsi-green-light: #E6F4EE;
+      --tsi-red: #C0392B;
+      --radius: 8px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--tsi-light);
+      color: var(--tsi-text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--tsi-blue);
+      color: #fff;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 64px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    header .logo {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: .05em;
+      color: var(--tsi-gold);
+    }
+    header .title {
+      font-size: 1rem;
+      opacity: .85;
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 16px 64px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--tsi-border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--tsi-blue);
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--tsi-gold);
+      display: inline-block;
+    }
+
+    /* ── Tabs (manager only) ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      padding: 9px 20px;
+      border: 1px solid var(--tsi-border);
+      border-radius: var(--radius) var(--radius) 0 0;
+      background: #fff;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--tsi-muted);
+      border-bottom: none;
+      transition: color .15s, background .15s;
+    }
+    .tab-btn.active {
+      background: var(--tsi-blue);
+      color: #fff;
+      border-color: var(--tsi-blue);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Form elements ── */
+    label {
+      display: block;
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--tsi-muted);
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    input[type="text"], input[type="number"], select, textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--tsi-border);
+      border-radius: var(--radius);
+      font-size: .95rem;
+      color: var(--tsi-text);
+      background: #fff;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--tsi-blue);
+      box-shadow: 0 0 0 3px rgba(0,56,101,.12);
+    }
+    .field { margin-bottom: 16px; }
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      border: none;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--tsi-blue); color: #fff; }
+    .btn-primary:hover { opacity: .88; }
+    .btn-gold { background: var(--tsi-gold); color: #fff; }
+    .btn-gold:hover { opacity: .88; }
+    .btn-sm { padding: 6px 12px; font-size: .8rem; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--tsi-border);
+      color: var(--tsi-text);
+    }
+    .btn-outline:hover { border-color: var(--tsi-blue); color: var(--tsi-blue); }
+    .btn-danger { background: var(--tsi-red); color: #fff; }
+
+    /* ── Shareable link box ── */
+    .link-box {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .link-box input {
+      flex: 1;
+      font-family: monospace;
+      font-size: .85rem;
+      background: var(--tsi-light);
+    }
+    .copy-feedback {
+      font-size: .8rem;
+      color: var(--tsi-green);
+      margin-top: 6px;
+      display: none;
+    }
+
+    /* ── Signs table ── */
+    .signs-table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .88rem;
+    }
+    th {
+      text-align: left;
+      padding: 8px 10px;
+      background: var(--tsi-blue);
+      color: #fff;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--tsi-border);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--tsi-light); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .badge-pending { background: #FFF3CD; color: #856404; }
+    .badge-done { background: var(--tsi-green-light); color: var(--tsi-green); }
+
+    /* ── Sign entry rows (client form) ── */
+    .sign-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .sign-row {
+      display: grid;
+      grid-template-columns: 1fr 90px 36px;
+      gap: 8px;
+      align-items: center;
+    }
+    .sign-row input[type="number"] { text-align: center; }
+    .remove-row {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--tsi-muted);
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    .remove-row:hover { color: var(--tsi-red); background: #fdecea; }
+
+    /* ── Previous signs list (client read-only) ── */
+    .prev-sign {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--tsi-border);
+    }
+    .prev-sign:last-child { border-bottom: none; }
+    .prev-sign-desc { font-weight: 600; }
+    .prev-sign-meta { font-size: .8rem; color: var(--tsi-muted); }
+    .prev-sign-qty {
+      font-size: .85rem;
+      font-weight: 700;
+      color: var(--tsi-blue);
+      white-space: nowrap;
+    }
+
+    /* ── Alerts / messages ── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: .9rem;
+      margin-bottom: 16px;
+    }
+    .alert-success { background: var(--tsi-green-light); color: var(--tsi-green); border: 1px solid #a8d5bc; }
+    .alert-error { background: #FDECEA; color: var(--tsi-red); border: 1px solid #f5c6c2; }
+    .alert-info { background: #E8F0FC; color: #1558D6; border: 1px solid #b6cdf5; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Invoice selector (manager tab 2) ── */
+    .invoice-selector { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 20px; }
+    .invoice-selector .field { margin-bottom: 0; flex: 1; }
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--tsi-muted);
+      font-size: .9rem;
+    }
+
+    /* ── Progress bar ── */
+    .progress-bar {
+      height: 4px;
+      background: var(--tsi-border);
+      border-radius: 2px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--tsi-gold);
+      transition: width .4s ease;
+    }
+
+    /* ── Event banner ── */
+    .event-banner {
+      background: var(--tsi-blue);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .event-banner .label { font-size: .75rem; opacity: .7; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+    .event-banner .event-name { font-size: 1.4rem; font-weight: 800; }
+    .event-banner .invoice-num { font-size: .85rem; opacity: .75; margin-top: 4px; }
+
+    /* ── Confirmation overlay ── */
+    .confirmation {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .confirmation .check-icon {
+      font-size: 3.5rem;
+      margin-bottom: 16px;
+    }
+    .confirmation h3 { font-size: 1.3rem; color: var(--tsi-green); margin-bottom: 8px; }
+    .confirmation p { color: var(--tsi-muted); margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">TSi</span>
+  <span class="title">Additional Sign Requests</span>
+</header>
+
+<main id="app"><!-- Rendered by JS --></main>
+
+<script>
+// ---------------------------------------------------------------------------
+// Routing: detect manager vs client view
+// ---------------------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const invoiceParam = params.get('invoice');
+const eventParam   = params.get('event');
+const isClientView = !!(invoiceParam && eventParam);
+
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const el = (tag, attrs = {}, ...children) => {
+  const e = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => {
+    if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else e[k] = v;
+  });
+  children.forEach(c => typeof c === 'string' ? e.append(c) : c && e.append(c));
+  return e;
+};
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Server error');
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Manager View
+// ---------------------------------------------------------------------------
+function renderManagerView() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('generate')">Generate Link</button>
+      <button class="tab-btn" onclick="switchTab('review')">Review Submissions</button>
+    </div>
+
+    <!-- Tab 1: Generate link -->
+    <div id="tab-generate" class="tab-panel active">
+      <div class="card">
+        <h2>Create Client Link</h2>
+        <div id="gen-alert"></div>
+        <div class="field-row">
+          <div class="field">
+            <label for="inv-id">Invoice ID</label>
+            <input type="text" id="inv-id" placeholder="e.g. INV-2024-001" />
+          </div>
+          <div class="field">
+            <label for="evt-name">Event Name</label>
+            <input type="text" id="evt-name" placeholder="e.g. Smith Wedding" />
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="generateLink()">
+          Generate Shareable Link
+        </button>
+
+        <div id="link-result" style="display:none; margin-top:20px;">
+          <label>Shareable Client Link</label>
+          <div class="link-box">
+            <input type="text" id="share-link" readonly />
+            <button class="btn btn-gold btn-sm" onclick="copyLink()">Copy</button>
+          </div>
+          <div class="copy-feedback" id="copy-feedback">Copied to clipboard!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Review submissions -->
+    <div id="tab-review" class="tab-panel">
+      <div class="card">
+        <h2>Review Submissions</h2>
+        <div class="invoice-selector">
+          <div class="field">
+            <label for="inv-select">Select Invoice</label>
+            <select id="inv-select" onchange="loadSignsForInvoice()">
+              <option value="">— select invoice —</option>
+            </select>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="loadInvoices()">↻ Refresh</button>
+        </div>
+        <div id="review-content">
+          <div class="empty-state">Select an invoice above to view submissions.</div>
+        </div>
+      </div>
+    </div>
+  `;
+  loadInvoices();
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['generate','review'][i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === `tab-${name}`);
+  });
+}
+
+async function generateLink() {
+  const invoiceId = $('inv-id').value.trim();
+  const eventName = $('evt-name').value.trim();
+  const alertEl = $('gen-alert');
+
+  if (!invoiceId || !eventName) {
+    alertEl.innerHTML = '<div class="alert alert-error">Please fill in both Invoice ID and Event Name.</div>';
+    return;
+  }
+
+  try {
+    await api('POST', '/api/invoices', { invoiceId, eventName });
+    const url = new URL(location.href);
+    url.search = '';
+    url.searchParams.set('invoice', invoiceId);
+    url.searchParams.set('event', encodeURIComponent(eventName));
+
+    const linkUrl = `${url.origin}${url.pathname}?invoice=${encodeURIComponent(invoiceId)}&event=${encodeURIComponent(eventName)}`;
+
+    $('share-link').value = linkUrl;
+    $('link-result').style.display = 'block';
+    alertEl.innerHTML = '<div class="alert alert-success">Invoice saved. Share the link below with your client.</div>';
+  } catch (err) {
+    alertEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+function copyLink() {
+  navigator.clipboard.writeText($('share-link').value).then(() => {
+    const fb = $('copy-feedback');
+    fb.style.display = 'block';
+    setTimeout(() => fb.style.display = 'none', 2000);
+  });
+}
+
+async function loadInvoices() {
+  try {
+    const invoices = await api('GET', '/api/invoices');
+    const sel = $('inv-select');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— select invoice —</option>';
+    invoices.forEach(inv => {
+      const opt = document.createElement('option');
+      opt.value = inv.invoiceId;
+      opt.dataset.event = inv.eventName;
+      opt.textContent = `${inv.invoiceId} – ${inv.eventName}`;
+      sel.append(opt);
+    });
+    if (prev) sel.value = prev;
+  } catch (err) {
+    console.error('Failed to load invoices:', err);
+  }
+}
+
+async function loadSignsForInvoice() {
+  const sel = $('inv-select');
+  const invoiceId = sel.value;
+  const content = $('review-content');
+
+  if (!invoiceId) {
+    content.innerHTML = '<div class="empty-state">Select an invoice above to view submissions.</div>';
+    return;
+  }
+
+  content.innerHTML = '<div class="empty-state">Loading…</div>';
+
+  try {
+    const signs = await api('GET', `/api/signs?invoice=${encodeURIComponent(invoiceId)}`);
+    renderSignsTable(signs, content, invoiceId);
+  } catch (err) {
+    content.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+function renderSignsTable(signs, container, invoiceId) {
+  if (signs.length === 0) {
+    container.innerHTML = '<div class="empty-state">No signs submitted yet for this invoice.</div>';
+    return;
+  }
+
+  const added = signs.filter(s => s.addedToSystem).length;
+  const pct = Math.round((added / signs.length) * 100);
+
+  const wrap = el('div');
+  wrap.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="font-size:.85rem; color:var(--tsi-muted);">${added} of ${signs.length} added to system</span>
+      <span style="font-size:.85rem; font-weight:700; color:var(--tsi-blue);">${pct}%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+  `;
+
+  const tableWrap = el('div', { class: 'signs-table-wrap' });
+  const table = el('table');
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th>Qty</th>
+        <th>Submitted</th>
+        <th>Status</th>
+        <th style="text-align:center;">Added to System</th>
+      </tr>
+    </thead>
+  `;
+
+  const tbody = el('tbody');
+  signs.forEach(sign => {
+    const tr = el('tr');
+    tr.innerHTML = `
+      <td>${escHtml(sign.description)}</td>
+      <td style="text-align:center; font-weight:700;">${sign.quantity}</td>
+      <td style="white-space:nowrap;">${fmtDate(sign.submittedAt)}</td>
+      <td>
+        <span class="badge ${sign.addedToSystem ? 'badge-done' : 'badge-pending'}">
+          ${sign.addedToSystem ? 'Added' : 'Pending'}
+        </span>
+      </td>
+      <td style="text-align:center;">
+        <input type="checkbox" ${sign.addedToSystem ? 'checked' : ''}
+          style="width:18px;height:18px;cursor:pointer;"
+          onchange="toggleAdded(this, ${sign.rowIndex}, '${escAttr(invoiceId)}')" />
+      </td>
+    `;
+    tbody.append(tr);
+  });
+
+  table.append(tbody);
+  tableWrap.append(table);
+  wrap.append(tableWrap);
+  container.innerHTML = '';
+  container.append(wrap);
+}
+
+async function toggleAdded(checkbox, rowIndex, invoiceId) {
+  const addedToSystem = checkbox.checked;
+  try {
+    await api('PATCH', `/api/signs/${rowIndex}`, { addedToSystem });
+    // Refresh the table
+    const signs = await api('GET', `/api/signs?invoice=${encodeURIComponent(invoiceId)}`);
+    renderSignsTable(signs, $('review-content'), invoiceId);
+  } catch (err) {
+    checkbox.checked = !addedToSystem; // revert
+    alert('Failed to update: ' + err.message);
+  }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  return String(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------------------
+// Client View
+// ---------------------------------------------------------------------------
+let signRowCount = 0;
+
+function renderClientView() {
+  const app = document.getElementById('app');
+  const eventName = decodeURIComponent(eventParam);
+  const invoiceId = decodeURIComponent(invoiceParam);
+
+  app.innerHTML = `
+    <div class="event-banner">
+      <div class="label">Event</div>
+      <div class="event-name">${escHtml(eventName)}</div>
+      <div class="invoice-num">Invoice: ${escHtml(invoiceId)}</div>
+    </div>
+
+    <!-- Previously submitted signs -->
+    <div class="card" id="prev-card">
+      <h2>Previously Submitted Signs</h2>
+      <div id="prev-list"><div class="empty-state">Loading…</div></div>
+    </div>
+
+    <!-- New sign submission form -->
+    <div class="card" id="form-card">
+      <h2>Submit Additional Signs</h2>
+      <div id="form-alert"></div>
+
+      <div style="display:grid; grid-template-columns: 1fr 90px; gap:8px; margin-bottom:8px; padding:0 44px 0 0;">
+        <label style="margin:0; color:var(--tsi-muted);">Sign Description</label>
+        <label style="margin:0; color:var(--tsi-muted); text-align:center;">Qty</label>
+      </div>
+
+      <div class="sign-rows" id="sign-rows"></div>
+
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="addSignRow()">+ Add Row</button>
+        <span id="row-count-label" style="font-size:.8rem; color:var(--tsi-muted);"></span>
+      </div>
+
+      <div style="margin-top:20px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <button class="btn btn-primary" id="submit-btn" onclick="submitSigns()">
+          Submit Signs
+        </button>
+        <span id="submit-status" style="font-size:.85rem; color:var(--tsi-muted);"></span>
+      </div>
+    </div>
+  `;
+
+  loadPreviousSigns(invoiceId, eventName);
+  addSignRow(); // start with 1 row
+}
+
+async function loadPreviousSigns(invoiceId, eventName) {
+  const list = $('prev-list');
+  try {
+    const signs = await api('GET', `/api/signs?invoice=${encodeURIComponent(invoiceId)}`);
+    if (signs.length === 0) {
+      list.innerHTML = '<div class="empty-state" style="padding:20px 0 0;">No signs submitted yet — be the first!</div>';
+      return;
+    }
+    list.innerHTML = '';
+    signs.forEach(sign => {
+      const div = el('div', { class: 'prev-sign' });
+      div.innerHTML = `
+        <div>
+          <div class="prev-sign-desc">${escHtml(sign.description)}</div>
+          <div class="prev-sign-meta">Submitted ${fmtDate(sign.submittedAt)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          <span class="prev-sign-qty">Qty: ${sign.quantity}</span>
+          <span class="badge ${sign.addedToSystem ? 'badge-done' : 'badge-pending'}">
+            ${sign.addedToSystem ? 'Added to System' : 'Pending'}
+          </span>
+        </div>
+      `;
+      list.append(div);
+    });
+  } catch (err) {
+    list.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+function addSignRow() {
+  if (signRowCount >= 100) return;
+  signRowCount++;
+
+  const rows = $('sign-rows');
+  const rowId = `row-${signRowCount}`;
+  const div = el('div', { class: 'sign-row', id: rowId });
+  div.innerHTML = `
+    <input type="text" placeholder="Sign description" class="sign-desc"
+      aria-label="Sign description ${signRowCount}" />
+    <input type="number" value="1" min="1" max="9999" class="sign-qty"
+      aria-label="Quantity ${signRowCount}" />
+    <button class="remove-row" onclick="removeSignRow('${rowId}')" title="Remove row">×</button>
+  `;
+  rows.append(div);
+  updateRowCountLabel();
+
+  // Focus the new description field
+  div.querySelector('.sign-desc').focus();
+}
+
+function removeSignRow(rowId) {
+  const row = $(rowId);
+  if (row) {
+    row.remove();
+    signRowCount = Math.max(0, signRowCount - 1);
+    updateRowCountLabel();
+  }
+}
+
+function updateRowCountLabel() {
+  const label = $('row-count-label');
+  const actual = $('sign-rows').querySelectorAll('.sign-row').length;
+  if (actual >= 100) {
+    label.textContent = 'Maximum 100 rows reached.';
+  } else {
+    label.textContent = `${actual} row${actual !== 1 ? 's' : ''}`;
+  }
+}
+
+async function submitSigns() {
+  const invoiceId = decodeURIComponent(invoiceParam);
+  const eventName = decodeURIComponent(eventParam);
+  const alertEl = $('form-alert');
+  const btn = $('submit-btn');
+
+  const rows = $('sign-rows').querySelectorAll('.sign-row');
+  const signs = [];
+  rows.forEach(row => {
+    const desc = row.querySelector('.sign-desc').value.trim();
+    const qty  = parseInt(row.querySelector('.sign-qty').value, 10) || 1;
+    if (desc) signs.push({ description: desc, quantity: qty });
+  });
+
+  if (signs.length === 0) {
+    alertEl.innerHTML = '<div class="alert alert-error">Please enter at least one sign description.</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Submitting…';
+  alertEl.innerHTML = '';
+
+  try {
+    const result = await api('POST', '/api/signs', { invoiceId, eventName, signs });
+    showConfirmation(result.saved, invoiceId, eventName);
+  } catch (err) {
+    alertEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = 'Submit Signs';
+  }
+}
+
+function showConfirmation(count, invoiceId, eventName) {
+  const formCard = $('form-card');
+  formCard.innerHTML = `
+    <div class="confirmation">
+      <div class="check-icon">✅</div>
+      <h3>Signs Submitted!</h3>
+      <p>${count} sign${count !== 1 ? 's' : ''} have been submitted for <strong>${escHtml(eventName)}</strong>.<br>
+      Our team will review them and add them to your order.</p>
+      <button class="btn btn-primary" onclick="addMoreSigns()">Submit More Signs</button>
+    </div>
+  `;
+  // Refresh the previous signs list
+  loadPreviousSigns(invoiceId, eventName);
+}
+
+function addMoreSigns() {
+  signRowCount = 0;
+  const invoiceId = decodeURIComponent(invoiceParam);
+  const eventName = decodeURIComponent(eventParam);
+
+  const formCard = $('form-card');
+  formCard.innerHTML = `
+    <h2>Submit Additional Signs</h2>
+    <div id="form-alert"></div>
+    <div style="display:grid; grid-template-columns: 1fr 90px; gap:8px; margin-bottom:8px; padding:0 44px 0 0;">
+      <label style="margin:0; color:var(--tsi-muted);">Sign Description</label>
+      <label style="margin:0; color:var(--tsi-muted); text-align:center;">Qty</label>
+    </div>
+    <div class="sign-rows" id="sign-rows"></div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <button class="btn btn-outline btn-sm" onclick="addSignRow()">+ Add Row</button>
+      <span id="row-count-label" style="font-size:.8rem; color:var(--tsi-muted);"></span>
+    </div>
+    <div style="margin-top:20px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <button class="btn btn-primary" id="submit-btn" onclick="submitSigns()">Submit Signs</button>
+      <span id="submit-status" style="font-size:.85rem; color:var(--tsi-muted);"></span>
+    </div>
+  `;
+  addSignRow();
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+if (isClientView) {
+  renderClientView();
+} else {
+  renderManagerView();
+}
+</script>
+</body>
+</html>

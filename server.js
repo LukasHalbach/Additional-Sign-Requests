@@ -105,6 +105,19 @@ app.patch('/api/signs/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// DELETE /api/invoices/:invoiceId
+// Removes the invoice record and all associated signs
+app.delete('/api/invoices/:invoiceId', (req, res) => {
+  const { invoiceId } = req.params;
+  const db = readDb();
+  const existed = db.invoices.some(i => i.invoiceId === invoiceId);
+  if (!existed) return res.status(404).json({ error: 'Invoice not found' });
+  db.invoices = db.invoices.filter(i => i.invoiceId !== invoiceId);
+  db.signs = db.signs.filter(s => s.invoiceId !== invoiceId);
+  writeDb(db);
+  res.json({ ok: true });
+});
+
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------

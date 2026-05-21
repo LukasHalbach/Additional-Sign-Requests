@@ -332,7 +332,22 @@
     .invoice-row-info { flex: 1; min-width: 0; }
     .invoice-row-id { font-weight: 700; font-size: .9rem; }
     .invoice-row-event { font-size: .82rem; color: var(--tsi-muted); margin-top: 2px; }
-    .invoice-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .invoice-row-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+
+    /* ── Delete confirmation panel ── */
+    .delete-confirm {
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: #fdecea;
+      border: 1px solid #f5c6c2;
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .delete-confirm-msg { font-size: .85rem; color: var(--tsi-red); flex: 1; }
+    .delete-confirm-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
     /* ── Invoice selector (manager tab 2) ── */
     .invoice-selector { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 20px; }
@@ -645,8 +660,9 @@ function renderInvoiceList(invoices, highlight = '') {
     const linkUrl = buildClientUrl(inv.invoiceId, inv.eventName);
     const feedbackId = `inv-copy-fb-${i}`;
     const inputId = `inv-link-${i}`;
+    const confirmId = `inv-confirm-${i}`;
 
-    const row = el('div', { class: 'invoice-row' });
+    const row = el('div', { class: 'invoice-row', id: `invoice-row-${i}` });
     row.innerHTML = `
       <div class="invoice-row-info">
         <div class="invoice-row-id">${escHtml(inv.invoiceId)}</div>
@@ -660,13 +676,38 @@ function renderInvoiceList(invoices, highlight = '') {
           onclick="switchTab('review'); document.getElementById('inv-select').value='${escAttr(inv.invoiceId)}'; loadSignsForInvoice();">
           View
         </button>
+        <button class="btn btn-outline btn-sm" onclick="toggleDeleteConfirm('${confirmId}')">Edit</button>
       </div>
       <div style="width:100%;">
         <div class="copy-feedback" id="${feedbackId}">Copied to clipboard!</div>
+        <div class="delete-confirm" id="${confirmId}" style="display:none;">
+          <span class="delete-confirm-msg">
+            Delete <strong>${escHtml(inv.invoiceId)}</strong> and all its sign records? This cannot be undone.
+          </span>
+          <div class="delete-confirm-actions">
+            <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${escAttr(inv.invoiceId)}')">Yes, Delete</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleDeleteConfirm('${confirmId}')">Cancel</button>
+          </div>
+        </div>
       </div>
     `;
     container.append(row);
   });
+}
+
+function toggleDeleteConfirm(confirmId) {
+  const panel = $(confirmId);
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+async function deleteInvoice(invoiceId) {
+  try {
+    await api('DELETE', `/api/invoices/${encodeURIComponent(invoiceId)}`);
+    await loadInvoices();
+  } catch (err) {
+    alert('Failed to delete: ' + err.message);
+  }
 }
 
 async function loadSignsForInvoice() {

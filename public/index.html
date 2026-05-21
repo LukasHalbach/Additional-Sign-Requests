@@ -333,21 +333,9 @@
     .invoice-row-id { font-weight: 700; font-size: .9rem; }
     .invoice-row-event { font-size: .82rem; color: var(--tsi-muted); margin-top: 2px; }
     .invoice-row-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
-
-    /* ── Delete confirmation panel ── */
-    .delete-confirm {
-      margin-top: 8px;
-      padding: 10px 14px;
-      background: #fdecea;
-      border: 1px solid #f5c6c2;
-      border-radius: var(--radius);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .delete-confirm-msg { font-size: .85rem; color: var(--tsi-red); flex: 1; }
-    .delete-confirm-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .invoice-row .delete-row-btn { display: none; }
+    .invoice-list-edit-mode .delete-row-btn { display: inline-flex !important; }
+    .edit-mode-btn-active { background: #1A1A1A !important; color: #fff !important; border-color: #1A1A1A !important; }
 
     /* ── Invoice selector (manager tab 2) ── */
     .invoice-selector { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 20px; }
@@ -492,12 +480,25 @@ function renderManagerView() {
       <!-- Past invoices / link lookup -->
       <div class="card">
         <h2>Past Invoices</h2>
-        <div style="margin-bottom:14px; display:flex; gap:8px; align-items:center;">
+        <div style="margin-bottom:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <input type="text" id="inv-search" placeholder="Search by invoice ID or event name…"
-            oninput="filterInvoiceList()" style="max-width:360px;" />
+            oninput="filterInvoiceList()" style="max-width:300px; flex:1;" />
           <button class="btn btn-outline btn-sm" onclick="loadInvoiceList()">↻ Refresh</button>
+          <button class="btn btn-outline btn-sm" id="edit-mode-btn" onclick="toggleEditMode()">Edit</button>
         </div>
         <div id="invoice-list"><div class="empty-state">Loading…</div></div>
+      </div>
+
+      <!-- Delete confirmation modal -->
+      <div id="delete-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:var(--radius); padding:28px 28px 22px; max-width:400px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,.25);">
+          <div style="font-size:1.05rem; font-weight:700; color:var(--tsi-red); margin-bottom:10px;">Delete Invoice?</div>
+          <div id="delete-modal-msg" style="font-size:.9rem; color:var(--tsi-text); margin-bottom:20px;"></div>
+          <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn btn-danger" id="delete-modal-confirm">Yes, Delete</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -660,9 +661,8 @@ function renderInvoiceList(invoices, highlight = '') {
     const linkUrl = buildClientUrl(inv.invoiceId, inv.eventName);
     const feedbackId = `inv-copy-fb-${i}`;
     const inputId = `inv-link-${i}`;
-    const confirmId = `inv-confirm-${i}`;
 
-    const row = el('div', { class: 'invoice-row', id: `invoice-row-${i}` });
+    const row = el('div', { class: 'invoice-row' });
     row.innerHTML = `
       <div class="invoice-row-info">
         <div class="invoice-row-id">${escHtml(inv.invoiceId)}</div>
@@ -676,39 +676,71 @@ function renderInvoiceList(invoices, highlight = '') {
           onclick="switchTab('review'); document.getElementById('inv-select').value='${escAttr(inv.invoiceId)}'; loadSignsForInvoice();">
           View
         </button>
-        <button class="btn btn-outline btn-sm" onclick="toggleDeleteConfirm('${confirmId}')">Edit</button>
+        <button class="btn btn-danger btn-sm delete-row-btn"
+          onclick="confirmDeleteInvoice('${escAttr(inv.invoiceId)}', '${escAttr(inv.eventName)}')">
+          Delete
+        </button>
       </div>
       <div style="width:100%;">
         <div class="copy-feedback" id="${feedbackId}">Copied to clipboard!</div>
-        <div class="delete-confirm" id="${confirmId}" style="display:none;">
-          <span class="delete-confirm-msg">
-            Delete <strong>${escHtml(inv.invoiceId)}</strong> and all its sign records? This cannot be undone.
-          </span>
-          <div class="delete-confirm-actions">
-            <button class="btn btn-danger btn-sm" onclick="deleteInvoice('${escAttr(inv.invoiceId)}')">Yes, Delete</button>
-            <button class="btn btn-outline btn-sm" onclick="toggleDeleteConfirm('${confirmId}')">Cancel</button>
-          </div>
-        </div>
       </div>
     `;
     container.append(row);
   });
 }
 
-function toggleDeleteConfirm(confirmId) {
-  const panel = $(confirmId);
-  if (!panel) return;
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-}
+let editModeActive = false;
 
-async function deleteInvoice(invoiceId) {
-  try {
-    await api('DELETE', `/api/invoices/${encodeURIComponent(invoiceId)}`);
-    await loadInvoices();
-  } catch (err) {
-    alert('Failed to delete: ' + err.message);
+function toggleEditMode() {
+  editModeActive = !editModeActive;
+  const list = $('invoice-list');
+  const btn  = $('edit-mode-btn');
+  if (editModeActive) {
+    list.classList.add('invoice-list-edit-mode');
+    btn.textContent = 'Done';
+    btn.classList.add('edit-mode-btn-active');
+  } else {
+    list.classList.remove('invoice-list-edit-mode');
+    btn.textContent = 'Edit';
+    btn.classList.remove('edit-mode-btn-active');
   }
 }
+
+function confirmDeleteInvoice(invoiceId, eventName) {
+  const backdrop = $('delete-modal-backdrop');
+  const msg      = $('delete-modal-msg');
+  const confirmBtn = $('delete-modal-confirm');
+
+  msg.innerHTML = `This will permanently delete invoice <strong>${escHtml(invoiceId)}</strong> (${escHtml(eventName)}) and all of its sign records. This cannot be undone.`;
+  backdrop.style.display = 'flex';
+
+  // Replace the confirm button to clear any previous onclick
+  const fresh = confirmBtn.cloneNode(true);
+  fresh.onclick = async () => {
+    closeDeleteModal();
+    try {
+      await api('DELETE', `/api/invoices/${encodeURIComponent(invoiceId)}`);
+      await loadInvoices();
+      // Keep edit mode on after deletion so the manager can delete more
+      if (editModeActive) {
+        $('invoice-list').classList.add('invoice-list-edit-mode');
+      }
+    } catch (err) {
+      alert('Failed to delete: ' + err.message);
+    }
+  };
+  confirmBtn.replaceWith(fresh);
+}
+
+function closeDeleteModal() {
+  $('delete-modal-backdrop').style.display = 'none';
+}
+
+// Close modal on backdrop click
+document.addEventListener('click', e => {
+  const backdrop = $('delete-modal-backdrop');
+  if (backdrop && e.target === backdrop) closeDeleteModal();
+});
 
 async function loadSignsForInvoice() {
   const sel = $('inv-select');

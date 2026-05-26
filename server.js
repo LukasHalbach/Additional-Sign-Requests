@@ -64,7 +64,7 @@ app.post('/api/invoices', (req, res) => {
 
 // POST /api/signs
 app.post('/api/signs', (req, res) => {
-  const { invoiceId, eventName, signs } = req.body;
+  const { invoiceId, eventName, signs, submittedBy } = req.body;
   if (!invoiceId || !eventName || !Array.isArray(signs) || signs.length === 0) {
     return res.status(400).json({ error: 'invoiceId, eventName, and signs[] required' });
   }
@@ -77,6 +77,7 @@ app.post('/api/signs', (req, res) => {
   }
   const db = readDb();
   const now = new Date().toISOString();
+  const submitter = (typeof submittedBy === 'string' && submittedBy.trim()) ? submittedBy.trim() : null;
   valid.forEach(s => {
     db.signs.push({
       id: nextSignId(db.signs),
@@ -84,6 +85,7 @@ app.post('/api/signs', (req, res) => {
       eventName,
       description: s.description.trim(),
       quantity: Number(s.quantity) || 1,
+      submittedBy: submitter,
       submittedAt: now,
       addedToSystem: false,
     });

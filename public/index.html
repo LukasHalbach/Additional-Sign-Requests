@@ -787,6 +787,7 @@ function renderSignsTable(signs, container, invoiceId) {
       <tr>
         <th>Description</th>
         <th>Qty</th>
+        <th>Submitted By</th>
         <th>Submitted</th>
         <th>Status</th>
         <th style="text-align:center;">Added to System</th>
@@ -800,6 +801,7 @@ function renderSignsTable(signs, container, invoiceId) {
     tr.innerHTML = `
       <td>${escHtml(sign.description)}</td>
       <td style="text-align:center; font-weight:700;">${sign.quantity}</td>
+      <td style="white-space:nowrap;">${sign.submittedBy ? escHtml(sign.submittedBy) : '<span style="color:var(--tsi-muted);">—</span>'}</td>
       <td style="white-space:nowrap;">${fmtDate(sign.submittedAt)}</td>
       <td>
         <span class="badge ${sign.addedToSystem ? 'badge-done' : 'badge-pending'}">
@@ -869,6 +871,17 @@ function renderClientView() {
     <div class="card" id="form-card">
       <h2>Submit Additional Signs</h2>
       <div id="form-alert"></div>
+
+      <div class="field-row" style="margin-bottom:16px;">
+        <div class="field" style="margin-bottom:0;">
+          <label for="submitter-first">First Name <span style="color:var(--tsi-red);">*</span></label>
+          <input type="text" id="submitter-first" placeholder="First name" autocomplete="given-name" />
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="submitter-last">Last Name <span style="color:var(--tsi-red);">*</span></label>
+          <input type="text" id="submitter-last" placeholder="Last name" autocomplete="family-name" />
+        </div>
+      </div>
 
       <div style="display:grid; grid-template-columns: 1fr 90px; gap:8px; margin-bottom:8px; padding:0 44px 0 0;">
         <label style="margin:0; color:var(--tsi-muted);">Sign Description</label>
@@ -977,6 +990,14 @@ async function submitSigns() {
   const alertEl = $('form-alert');
   const btn = $('submit-btn');
 
+  const firstName = ($('submitter-first').value || '').trim();
+  const lastName  = ($('submitter-last').value  || '').trim();
+  if (!firstName || !lastName) {
+    alertEl.innerHTML = '<div class="alert alert-error">Please enter your first and last name before submitting.</div>';
+    return;
+  }
+  const submittedBy = `${firstName} ${lastName}`;
+
   const rows = $('sign-rows').querySelectorAll('.sign-row');
   const signs = [];
   rows.forEach(row => {
@@ -995,7 +1016,7 @@ async function submitSigns() {
   alertEl.innerHTML = '';
 
   try {
-    const result = await api('POST', '/api/signs', { invoiceId, eventName, signs });
+    const result = await api('POST', '/api/signs', { invoiceId, eventName, signs, submittedBy });
     showConfirmation(result.saved, invoiceId, eventName);
   } catch (err) {
     alertEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
@@ -1028,6 +1049,16 @@ function addMoreSigns() {
   formCard.innerHTML = `
     <h2>Submit Additional Signs</h2>
     <div id="form-alert"></div>
+    <div class="field-row" style="margin-bottom:16px;">
+      <div class="field" style="margin-bottom:0;">
+        <label for="submitter-first">First Name <span style="color:var(--tsi-red);">*</span></label>
+        <input type="text" id="submitter-first" placeholder="First name" autocomplete="given-name" />
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="submitter-last">Last Name <span style="color:var(--tsi-red);">*</span></label>
+        <input type="text" id="submitter-last" placeholder="Last name" autocomplete="family-name" />
+      </div>
+    </div>
     <div style="display:grid; grid-template-columns: 1fr 90px; gap:8px; margin-bottom:8px; padding:0 44px 0 0;">
       <label style="margin:0; color:var(--tsi-muted);">Sign Description</label>
       <label style="margin:0; color:var(--tsi-muted); text-align:center;">Qty</label>
